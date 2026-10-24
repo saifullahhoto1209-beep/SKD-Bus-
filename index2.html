@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Skd Bus Driving - Skardu Express</title>
+<style>
+  body{margin:0;background:#000;display:flex;justify-content:center;align-items:center;height:100vh;overflow:hidden;font-family:sans-serif}
+  #gameBox{position:relative;width:500px;height:700px;background:#87CEEB;overflow:hidden;border-radius:12px}
+  canvas{width:100%;height:100%;display:block}
+  #ui{position:absolute;top:0;left:0;width:100%;padding:10px 15px;display:flex;justify-content:space-between;color:#fff;font-weight:900;font-size:18px;text-shadow:1px 1px 2px #000;z-index:5;box-sizing:border-box}
+  #controls{position:absolute;bottom:0;left:0;width:100%;height:130px;display:flex;justify-content:space-between;align-items:center;padding:0 20px;box-sizing:border-box;z-index:5}
+ .btn{width:70px;height:70px;background:rgba(0,0,0,0.5);border:2px solid #fff;border-radius:50%;color:#fff;font-size:24px;display:flex;align-items:center;justify-content:center;user-select:none}
+ .btn:active{background:#FF6B00}
+  #start{position:absolute;inset:0;background:rgba(0,0,0,0.9);display:flex;flex-direction:column;justify-content:center;align-items:center;color:#fff;z-index:10;text-align:center}
+  #start h1{color:#FF6B00;margin:0;font-size:32px}
+  #start button{padding:15px 40px;background:#FF6B00;border:none;border-radius:30px;color:#fff;font-size:20px;font-weight:bold;margin-top:20px}
+</style>
+</head>
+<body>
+<div id="gameBox">
+  <div id="ui"><span id="coins">🪙 0</span><span id="dist">0 KM</span><span id="speed">0 KM/H</span></div>
+  <canvas id="c" width="400" height="750"></canvas>
+  <div id="controls">
+    <div style="display:flex;gap:25px"><div class="btn" id="left">◀</div><div class="btn" id="right">▶</div></div>
+    <div style="display:flex;gap:25px"><div class="btn" id="horn">🔔</div><div class="btn" id="brake">🛑</div></div>
+  </div>
+  <div id="start">
+    <h1>Skd BUS<br>Skardu EXPRESS</h1>
+    <p>Skardu se Pindi tak safar</p>
+    <p style="font-size:13px;opacity:0.7">Left/Right se Bus control karo<br>Coins jama karo, Truck se bacho</p>
+    <button id="playBtn">Play</button>
+  </div>
+</div>
+
+<script>
+const canvas=document.getElementById('c'), ctx=canvas.getContext('2d');
+let running=true, busX=0, busY=500, speed=5, maxSpeed=8, coins=0, dist=0;
+let roadY=0, traffic=[], coinList=[], keys={};
+
+const busImg = {w:40, h:55};
+
+function reset(){
+  busX=180; speed=2; coins=0; dist=0; traffic=[]; coinList=[]; roadY=0;
+}
+
+function loop(){
+  if(!running) return;
+  // Road move
+  roadY+=speed; if(roadY>30) roadY=0;
+
+  ctx.clearRect(0,0,400,700);
+  // Sky
+  ctx.fillStyle='#87CEEB'; ctx.fillRect(0,0,400,550);
+  // Mountains
+  ctx.fillStyle='#fff'; ctx.beginPath(); ctx.moveTo(0,200); ctx.lineTo(100,80); ctx.lineTo(200,200); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(150,200); ctx.lineTo(300,60); ctx.lineTo(400,200); ctx.fill();
+  // Road
+  ctx.fillStyle='#444'; ctx.fillRect(30,0,340,700);
+  ctx.fillStyle='#222'; ctx.fillRect(30,0,20,700); ctx.fillRect(350,0,20,700);
+  // Road lines
+  ctx.fillStyle='#fff'; for(let i=-40+roadY;i<700;i+=40){ctx.fillRect(195,i,10,20)}
+  ctx.strokeStyle='#ff0'; ctx.lineWidth=3; ctx.beginPath(); ctx.moveTo(50,0); ctx.lineTo(50,700); ctx.moveTo(350,0); ctx.lineTo(350,700); ctx.stroke();
+
+  // Controls
+  if(keys.left && busX>40) busX-=5;
+  if(keys.right && busX<310) busX+=5;
+  if(speed<maxSpeed) speed+=0.02;
+  dist+=speed/100;
+
+  // Bus
+  ctx.fillStyle='#FF6B00'; ctx.fillRect(busX,busY,busImg.w,busImg.h);
+  ctx.fillStyle='#000'; ctx.fillRect(busX+5,busY+5,10,15); // windshield
+  ctx.fillStyle='#0af'; ctx.fillRect(busX+7,busY+7,31,11);
+  ctx.fillStyle='#fff'; ctx.font='bold 8px Arial'; ctx.fillText('AK BUS',busX+5,busY+45);
+  ctx.fillStyle='#111'; ctx.fillRect(busX+2,busY+70,12,15); ctx.fillRect(busX+31,busY+70,12,15);
+
+  // Traffic (enemy trucks)
+  if(Math.random()<0.015){traffic.push({x:40+Math.random()*270,y:-100,w:35,h:55})}
+  traffic.forEach((t,i)=>{
+    t.y+=speed-1; ctx.fillStyle='#ddd'; ctx.fillRect(t.x,t.y,t.w,t.h);
+    ctx.fillStyle='#a00'; ctx.fillRect(t.x+5,t.y+10,t.w-10,10);
+    if(t.y>750) traffic.splice(i,1);
+    if(busX < t.x+t.w && busX+busImg.w > t.x && busY < t.y+t.h && busY+busImg.h > t.y){
+      gameOver();
+    }
+  });
+
+  // Coins / Sawari
+  if(Math.random()<0.03){coinList.push({x:50+Math.random()*300,y:-20})}
+  coinList.forEach((c,i)=>{
+    c.y+=speed; ctx.fillStyle='gold'; ctx.beginPath(); ctx.arc(c.x,c.y,10,0,Math.PI*2); ctx.fill();
+    if(c.y>750) coinList.splice(i,1);
+    if(Math.hypot(busX+22-c.x,busY+45-c.y)<35){coins+=10; coinList.splice(i,1)}
+  });
+
+  document.getElementById('coins').innerText='🪙 '+coins;
+  document.getElementById('dist').innerText=Math.floor(dist)+' KM';
+  document.getElementById('speed').innerText=Math.floor(speed*15)+' KM/H';
+
+  requestAnimationFrame(loop);
+}
+
+function gameOver(){
+  running=false;
+  document.getElementById('start').style.display='flex';
+  document.getElementById('start').querySelector('h1').innerHTML='CRASH! 💥<br>'+Math.floor(dist)+' KM';
+  document.getElementById('playBtn').innerText='Try again';
+  // Yahan AdMob Interstitial Ad ayega
+}
+
+document.getElementById('playBtn').onclick=()=>{
+  reset(); running=true; document.getElementById('start').style.display='none'; loop();
+};
+
+// Controls
+function bindBtn(id, key){
+  let el=document.getElementById(id);
+  el.addEventListener('touchstart',e=>{e.preventDefault(); keys[key]=true; if(id=='horn'){/*horn sound*/}});
+  el.addEventListener('touchend',e=>{e.preventDefault(); keys[key]=false});
+  el.addEventListener('mousedown',()=>keys[key]=true);
+  el.addEventListener('mouseup',()=>keys[key]=false);
+}
+bindBtn('left','left'); bindBtn('right','right');
+document.getElementById('brake').addEventListener('touchstart',()=>{speed=Math.max(1,speed-2)});
+document.getElementById('brake').addEventListener('touchend',()=>{speed=2});
+canvas.addEventListener('touchmove',e=>{busX=e.touches[0].clientX-100});
+
+</script>
+</body>
+</html>
